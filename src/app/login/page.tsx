@@ -1,9 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,7 +19,7 @@ export default function LoginPage() {
       })
 
       const data = await res.json()
-      console.log('Login response:', data) // debug ke liye
+      console.log('Login response:', data)
 
       if (!res.ok) {
         setError(data.error || 'Login failed')
@@ -30,8 +28,6 @@ export default function LoginPage() {
       }
 
       const role = data.user?.role
-      console.log('User role:', role) // debug ke liye
-
       if (role === 'moderator') {
         window.location.href = '/dashboard/moderator'
       } else if (role === 'admin' || role === 'super_admin') {
@@ -41,7 +37,7 @@ export default function LoginPage() {
       }
 
     } catch (err) {
-      console.error('Login fetch error:', err)
+      console.error(err)
       setError('Something went wrong. Try again.')
       setLoading(false)
     }
@@ -54,14 +50,12 @@ export default function LoginPage() {
           <a href="/" className="text-2xl font-bold text-blue-400">AdFlow Pro</a>
           <p className="text-gray-400 mt-2">Sign in to your account</p>
         </div>
-
         <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-5">
           {error && (
             <div className="bg-red-900/30 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
-
           <div>
             <label className="text-gray-400 text-sm mb-1.5 block">Email</label>
             <input
@@ -73,7 +67,6 @@ export default function LoginPage() {
               required
             />
           </div>
-
           <div>
             <label className="text-gray-400 text-sm mb-1.5 block">Password</label>
             <input
@@ -85,7 +78,6 @@ export default function LoginPage() {
               required
             />
           </div>
-
           <button
             type="submit"
             disabled={loading}
@@ -93,7 +85,6 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
-
           <p className="text-center text-gray-500 text-sm">
             Don't have an account?{' '}
             <a href="/register" className="text-blue-400 hover:underline">Register</a>

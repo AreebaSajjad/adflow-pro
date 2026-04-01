@@ -13,18 +13,19 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const parsed = loginSchema.safeParse(body)
-
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
     const { email, password } = parsed.data
 
-    const { data: user } = await supabaseAdmin
+    const { data: user, error: dbError } = await supabaseAdmin
       .from('users')
       .select('id, name, email, role, status, password_hash')
       .eq('email', email)
       .single()
+
+    console.log('DB user found:', user, 'DB error:', dbError)
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
     }
 
     const valid = await bcrypt.compare(password, user.password_hash)
+    console.log('Password valid:', valid)
+
     if (!valid) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
