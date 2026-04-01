@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data
 
-    // Find user
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('id, name, email, role, status, password_hash')
@@ -35,13 +34,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Account suspended' }, { status: 403 })
     }
 
-    // Check password
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    // Generate token
     const token = signToken({ userId: user.id, email: user.email, role: user.role })
 
     const response = NextResponse.json({
@@ -58,7 +55,9 @@ export async function POST(req: NextRequest) {
     })
 
     return response
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+
+  } catch (err) {
+    console.error('Login error:', err)
+    return NextResponse.json({ error: 'Server error', detail: String(err) }, { status: 500 })
   }
 }

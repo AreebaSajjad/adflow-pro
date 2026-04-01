@@ -76,7 +76,8 @@ export async function POST(req: NextRequest) {
     })
 
     return response
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }  catch (err) {
+    console.error('Register error:', err)
+    return NextResponse.json({ error: 'Server error', detail: String(err) }, { status: 500 })
   }
 }

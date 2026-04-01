@@ -13,25 +13,38 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
-    const data = await res.json()
-    setLoading(false)
+      const data = await res.json()
+      console.log('Login response:', data) // debug ke liye
 
-    if (!res.ok) {
-      setError(data.error)
-      return
+      if (!res.ok) {
+        setError(data.error || 'Login failed')
+        setLoading(false)
+        return
+      }
+
+      const role = data.user?.role
+      console.log('User role:', role) // debug ke liye
+
+      if (role === 'moderator') {
+        window.location.href = '/dashboard/moderator'
+      } else if (role === 'admin' || role === 'super_admin') {
+        window.location.href = '/dashboard/admin'
+      } else {
+        window.location.href = '/dashboard/client'
+      }
+
+    } catch (err) {
+      console.error('Login fetch error:', err)
+      setError('Something went wrong. Try again.')
+      setLoading(false)
     }
-
-    // Redirect based on role
-    const role = data.user.role
-    if (role === 'client') router.push('/dashboard/client')
-    else if (role === 'moderator') router.push('/dashboard/moderator')
-    else router.push('/dashboard/admin')
   }
 
   return (
