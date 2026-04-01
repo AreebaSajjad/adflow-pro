@@ -13,7 +13,7 @@
 
 ## 🔗 Live Demo
 
-**[https://adflow-pro-fa23-bcs-033-a.vercel.app](areeba-sajjad.vercel.app)**
+**[https://areeba-sajjad.vercel.app](areeba-sajjad.vercel.app)**
 
 ---
 
