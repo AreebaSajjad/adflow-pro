@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
   const token = req.cookies.get('token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -19,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { data: payment } = await supabaseAdmin
     .from('payments')
     .select('*, ads(title, user_id, package_id)')
-    .eq('id', params.id)
+    .eq('id', id) // ✅ fixed
     .single()
 
   if (!payment) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
@@ -36,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       verified_at: new Date().toISOString(),
       note: note || null,
     })
-    .eq('id', params.id)
+    .eq('id', id) // ✅ fixed
 
   // Update ad status
   await supabaseAdmin
@@ -78,11 +83,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   await supabaseAdmin.from('notifications').insert({
     user_id: payment.ads.user_id,
     title: action === 'verify' ? 'Payment Verified — Ad Live!' : 'Payment Rejected',
-    message: action === 'verify'
-      ? `Your ad "${payment.ads.title}" is now live!`
-      : `Payment for "${payment.ads.title}" was rejected. Reason: ${note || 'Invalid transaction'}`,
+    message:
+      action === 'verify'
+        ? `Your ad "${payment.ads.title}" is now live!`
+        : `Payment for "${payment.ads.title}" was rejected. Reason: ${note || 'Invalid transaction'}`,
     type: action === 'verify' ? 'success' : 'error',
   })
 
-  return NextResponse.json({ message: `Payment ${action === 'verify' ? 'verified' : 'rejected'}` })
+  return NextResponse.json({
+    message: `Payment ${action === 'verify' ? 'verified' : 'rejected'}`
+  })
 }
