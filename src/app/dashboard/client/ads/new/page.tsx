@@ -19,11 +19,25 @@ export default function NewAdPage() {
     media_url: '',
   })
 
-  useEffect(() => {
-    fetch('/api/packages').then(r => r.json()).then(d => setPackages(d.packages || []))
-    fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories || []))
-    fetch('/api/cities').then(r => r.json()).then(d => setCities(d.cities || []))
-  }, [])
+ useEffect(() => {
+  const token = localStorage.getItem('token')
+  const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+
+  fetch('/api/packages', { headers })
+    .then(r => r.json())
+    .then(d => setPackages(d.packages || []))
+    .catch(() => setPackages([]))
+
+  fetch('/api/categories', { headers })
+    .then(r => r.json())
+    .then(d => setCategories(d.categories || []))
+    .catch(() => setCategories([]))
+
+  fetch('/api/cities', { headers })
+    .then(r => r.json())
+    .then(d => setCities(d.cities || []))
+    .catch(() => setCities([]))
+}, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

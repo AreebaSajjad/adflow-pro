@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  
   const token = req.cookies.get('token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -12,28 +14,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const { action, note } = await req.json()
-
-  if (!['approve', 'reject'].includes(action)) {
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  }
-
   const newStatus = action === 'approve' ? 'payment_pending' : 'rejected'
 
   const { data: ad } = await supabaseAdmin
     .from('ads')
     .select('status, user_id, title')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!ad) return NextResponse.json({ error: 'Ad not found' }, { status: 404 })
 
-  await supabaseAdmin
-    .from('ads')
-    .update({ status: newStatus })
-    .eq('id', params.id)
+  await supabaseAdmin.from('ads').update({ status: newStatus }).eq('id', id)
 
   await supabaseAdmin.from('ad_status_history').insert({
-    ad_id: params.id,
+    ad_id: id,
     previous_status: ad.status,
     new_status: newStatus,
     changed_by: payload.userId,

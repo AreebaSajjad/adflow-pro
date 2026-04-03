@@ -100,6 +100,7 @@ export default function ClientDashboard() {
                   <th className="text-left px-6 py-3 text-gray-400 text-sm font-medium">Package</th>
                   <th className="text-left px-6 py-3 text-gray-400 text-sm font-medium">Status</th>
                   <th className="text-left px-6 py-3 text-gray-400 text-sm font-medium">Date</th>
+                  <th className="text-left px-6 py-3 text-gray-400 text-sm font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,6 +117,14 @@ export default function ClientDashboard() {
                     <td className="px-6 py-4 text-gray-400 text-sm">
                       {new Date(ad.created_at).toLocaleDateString()}
                     </td>
+                     <td className="px-6 py-4">
+                       {ad.status === 'payment_pending' && (
+    
+                         < a href="/dashboard/client/payments"
+                         className="bg-yellow-600 hover:bg-yellow-500 px-3 py-1.5 rounded-lg text-xs font-medium        transition">
+      Pay Now</a>
+  )}
+                        </td>
                   </tr>
                 ))}
               </tbody>
