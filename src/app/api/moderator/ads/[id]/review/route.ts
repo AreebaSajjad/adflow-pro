@@ -7,7 +7,7 @@ export async function PATCH(
   context: any
 ) {
   const id = context.params?.id || (await context.params)?.id
-  
+
   const token = req.cookies.get('token')?.value
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,10 +31,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Ad not found' }, { status: 404 })
   }
 
-  await supabaseAdmin
-    .from('ads')
-    .update({ status: newStatus })
-    .eq('id', id)
+  await supabaseAdmin.from('ads').update({ status: newStatus }).eq('id', id)
 
   await supabaseAdmin.from('ad_status_history').insert({
     ad_id: id,
