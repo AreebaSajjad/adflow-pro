@@ -4,12 +4,14 @@ import { verifyToken } from '@/lib/jwt'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
+  const { id } = params
 
   const token = req.cookies.get('token')?.value
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const payload = verifyToken(token)
   if (!payload || !['admin', 'super_admin'].includes(payload.role)) {
@@ -24,10 +26,12 @@ export async function PATCH(
   const { data: payment } = await supabaseAdmin
     .from('payments')
     .select('*, ads(title, user_id, package_id)')
-    .eq('id', id) // ✅ fixed
+    .eq('id', id)
     .single()
 
-  if (!payment) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  if (!payment) {
+    return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+  }
 
   const newPaymentStatus = action === 'verify' ? 'verified' : 'rejected'
   const newAdStatus = action === 'verify' ? 'payment_verified' : 'payment_pending'
@@ -41,7 +45,7 @@ export async function PATCH(
       verified_at: new Date().toISOString(),
       note: note || null,
     })
-    .eq('id', id) // ✅ fixed
+    .eq('id', id)
 
   // Update ad status
   await supabaseAdmin
