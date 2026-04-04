@@ -4,9 +4,9 @@ import { verifyToken } from '@/lib/jwt'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
-  const { id } = params
+  const id = context.params?.id || (await context.params)?.id
 
   const token = req.cookies.get('token')?.value
   if (!token) {
