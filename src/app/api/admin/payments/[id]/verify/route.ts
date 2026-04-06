@@ -2,16 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
-export async function PATCH(
-  req: NextRequest,
-  context: any
-) {
-  const id = context.params?.id || (await context.params)?.id
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
 
   const token = req.cookies.get('token')?.value
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const payload = verifyToken(token)
   if (!payload || !['admin', 'super_admin'].includes(payload.role)) {
@@ -29,14 +24,11 @@ export async function PATCH(
     .eq('id', id)
     .single()
 
-  if (!payment) {
-    return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
-  }
+  if (!payment) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
 
   const newPaymentStatus = action === 'verify' ? 'verified' : 'rejected'
   const newAdStatus = action === 'verify' ? 'payment_verified' : 'payment_pending'
 
-  // Update payment
   await supabaseAdmin
     .from('payments')
     .update({
@@ -47,13 +39,11 @@ export async function PATCH(
     })
     .eq('id', id)
 
-  // Update ad status
   await supabaseAdmin
     .from('ads')
     .update({ status: newAdStatus })
     .eq('id', payment.ad_id)
 
-  // If verified, auto-publish immediately
   if (action === 'verify') {
     const { data: pkg } = await supabaseAdmin
       .from('packages')
@@ -83,18 +73,14 @@ export async function PATCH(
     })
   }
 
-  // Notify client
   await supabaseAdmin.from('notifications').insert({
     user_id: payment.ads.user_id,
     title: action === 'verify' ? 'Payment Verified — Ad Live!' : 'Payment Rejected',
-    message:
-      action === 'verify'
-        ? `Your ad "${payment.ads.title}" is now live!`
-        : `Payment for "${payment.ads.title}" was rejected. Reason: ${note || 'Invalid transaction'}`,
+    message: action === 'verify'
+      ? `Your ad "${payment.ads.title}" is now live!`
+      : `Payment for "${payment.ads.title}" was rejected. Reason: ${note || 'Invalid transaction'}`,
     type: action === 'verify' ? 'success' : 'error',
   })
 
-  return NextResponse.json({
-    message: `Payment ${action === 'verify' ? 'verified' : 'rejected'}`
-  })
+  return NextResponse.json({ message: `Payment ${action === 'verify' ? 'verified' : 'rejected'}` })
 }

@@ -2,16 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
-export async function PATCH(
-  req: NextRequest,
-  context: any
-) {
-  const id = context.params?.id || (await context.params)?.id
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
 
   const token = req.cookies.get('token')?.value
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const payload = verifyToken(token)
   if (!payload || !['moderator', 'admin', 'super_admin'].includes(payload.role)) {
@@ -19,6 +14,11 @@ export async function PATCH(
   }
 
   const { action, note } = await req.json()
+
+  if (!['approve', 'reject'].includes(action)) {
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+  }
+
   const newStatus = action === 'approve' ? 'payment_pending' : 'rejected'
 
   const { data: ad } = await supabaseAdmin
@@ -27,11 +27,12 @@ export async function PATCH(
     .eq('id', id)
     .single()
 
-  if (!ad) {
-    return NextResponse.json({ error: 'Ad not found' }, { status: 404 })
-  }
+  if (!ad) return NextResponse.json({ error: 'Ad not found' }, { status: 404 })
 
-  await supabaseAdmin.from('ads').update({ status: newStatus }).eq('id', id)
+  await supabaseAdmin
+    .from('ads')
+    .update({ status: newStatus })
+    .eq('id', id)
 
   await supabaseAdmin.from('ad_status_history').insert({
     ad_id: id,
@@ -44,10 +45,9 @@ export async function PATCH(
   await supabaseAdmin.from('notifications').insert({
     user_id: ad.user_id,
     title: action === 'approve' ? 'Ad Approved!' : 'Ad Rejected',
-    message:
-      action === 'approve'
-        ? `Your ad "${ad.title}" passed review. Please submit payment.`
-        : `Your ad "${ad.title}" was rejected. Reason: ${note || 'Policy violation'}`,
+    message: action === 'approve'
+      ? `Your ad "${ad.title}" passed review. Please submit payment.`
+      : `Your ad "${ad.title}" was rejected. Reason: ${note || 'Policy violation'}`,
     type: action === 'approve' ? 'success' : 'error',
   })
 
