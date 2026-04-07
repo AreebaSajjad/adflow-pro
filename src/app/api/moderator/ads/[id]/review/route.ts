@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { verifyToken } from '@/lib/jwt'
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params 
+export async function PATCH(
+  request: NextRequest, 
+  context: { 
+    params: Promise<{ id: string }>
+  }
+) {
+  const params = await context.params
+  const { id } = params
 
-  const token = req.cookies.get('token')?.value
+  const token = request.cookies.get('token')?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const payload = verifyToken(token)
@@ -13,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { action, note } = await req.json()
+  const { action, note } = await request.json()
 
   if (!['approve', 'reject'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
