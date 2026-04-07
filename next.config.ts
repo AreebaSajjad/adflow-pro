@@ -3,8 +3,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {                    // 👈 ये 2 lines add करो
-    ignoreDuringBuilds: true,  // 👈
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  experimental: {           
+    typedRoutes: false,     
   },
   images: {
     domains: ['img.youtube.com', 'res.cloudinary.com', 'raw.githubusercontent.com'],
