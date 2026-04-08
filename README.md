@@ -13,7 +13,7 @@
 
 ## 🔗 Live Demo
 
-**[https://areeba-sajjad.vercel.app](areeba-sajjad.vercel.app)**
+**[https://areeba-sajjad.vercel.app/](areeba-sajjad.vercel.ap)**
 
 ---
 
