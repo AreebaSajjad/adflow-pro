@@ -125,7 +125,7 @@ Each transition is logged in `ad_status_history` for full traceability.
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/AreebaSajjad/adflow-pro-FA23-BCS-033-A.git
+git clone https://github.com/AreebaSajjad/adflow-pro.git
 cd adflow-pro
 ```
 
