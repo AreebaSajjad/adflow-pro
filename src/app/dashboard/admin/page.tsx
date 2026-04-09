@@ -1,159 +1,224 @@
-'use client'
-import { useEffect, useState } from 'react'
+"use client";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import { supabase } from "@/lib/supabase";
+import {
+  FileText, Users, CreditCard, CheckCircle, Clock, TrendingUp,
+  XCircle, BarChart3, Activity, ArrowRight, RefreshCw, Shield,
+  Eye, Zap, AlertTriangle
+} from "lucide-react";
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  published:        { label: "Live",            color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  under_review:     { label: "Under Review",    color: "#60a5fa", bg: "rgba(96,165,250,0.12)" },
+  payment_pending:  { label: "Awaiting Payment",color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  payment_submitted:{ label: "Payment Sent",    color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  rejected:         { label: "Rejected",        color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+  draft:            { label: "Draft",           color: "#64748b", bg: "rgba(100,116,139,0.12)" },
+  expired:          { label: "Expired",         color: "#64748b", bg: "rgba(100,116,139,0.12)" },
+  submitted:        { label: "Submitted",       color: "#818cf8", bg: "rgba(129,140,248,0.12)" },
+};
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState<any>(null)
-  const [payments, setPayments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState({
+    totalAds: 0, activeAds: 0, pendingReview: 0, pendingPayment: 0,
+    totalUsers: 0, totalRevenue: 0, approvalRate: 0, todayAds: 0,
+  });
+  const [recentAds, setRecentAds] = useState<any[]>([]);
+  const [recentPayments, setRecentPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      if (!d.user) { window.location.href = '/login'; return }
-      setUser(d.user)
-      loadPayments()
-    })
-  }, [])
+    const stored = localStorage.getItem("adflow_user");
+    if (!stored) { window.location.href = "/login"; return; }
+    const u = JSON.parse(stored);
+    if (u.role !== "admin" && u.role !== "super_admin") { window.location.href = "/dashboard/client"; return; }
+    setUser(u);
+    fetchData();
+  }, []);
 
-  function loadPayments() {
-    fetch('/api/admin/payment-queue')
-      .then(r => r.json())
-      .then(d => { setPayments(d.payments || []); setLoading(false) })
+  async function fetchData() {
+    setRefreshing(true);
+    try {
+      const [adsRes, usersRes, paymentsRes] = await Promise.all([
+        supabase.from("ads").select("*, packages(price, name), categories(name)"),
+        supabase.from("users").select("id, role, status, created_at"),
+        supabase.from("payments").select("*, ads(title)").order("created_at", { ascending: false }).limit(5),
+      ]);
+
+      const ads = adsRes.data || [];
+      const users = usersRes.data || [];
+      const payments = paymentsRes.data || [];
+
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const totalRevenue = ads.filter(a => a.status === "published").reduce((sum: number, a: any) => sum + (a.packages?.price || 0), 0);
+      const approvedCount = ads.filter(a => !["rejected", "draft"].includes(a.status)).length;
+      const reviewedCount = ads.filter(a => a.status !== "draft").length;
+
+      setStats({
+        totalAds: ads.length,
+        activeAds: ads.filter(a => a.status === "published").length,
+        pendingReview: ads.filter(a => ["submitted", "under_review"].includes(a.status)).length,
+        pendingPayment: ads.filter(a => ["payment_pending", "payment_submitted"].includes(a.status)).length,
+        totalUsers: users.filter(u => u.role === "client").length,
+        totalRevenue,
+        approvalRate: reviewedCount > 0 ? Math.round((approvedCount / reviewedCount) * 100) : 0,
+        todayAds: ads.filter(a => new Date(a.created_at) >= today).length,
+      });
+
+      setRecentAds(ads.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8));
+      setRecentPayments(payments);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }
 
-  async function handlePayment(paymentId: string, action: 'verify' | 'reject') {
-    setActionLoading(paymentId + action)
-    await fetch(`/api/admin/payments/${paymentId}/verify`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    })
-    setActionLoading(null)
-    loadPayments()
+  async function verifyPayment(paymentId: string, adId: string) {
+    await supabase.from("payments").update({ status: "verified", verified_by: user.id, verified_at: new Date().toISOString() }).eq("id", paymentId);
+    await supabase.from("ads").update({ status: "published", publish_at: new Date().toISOString() }).eq("id", adId);
+    fetchData();
   }
 
-  async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    window.location.href = '/login'
-  }
-
-  if (loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <p className="text-gray-400">Loading...</p>
-    </div>
-  )
+  const STAT_CARDS = [
+    { label: "Total Ads", value: stats.totalAds, icon: <FileText size={20} />, color: "#3b6ef0", trend: `+${stats.todayAds} today` },
+    { label: "Live Ads", value: stats.activeAds, icon: <CheckCircle size={20} />, color: "#10b981", trend: `${stats.approvalRate}% approval rate` },
+    { label: "Pending Review", value: stats.pendingReview, icon: <Clock size={20} />, color: "#f59e0b", trend: "Needs attention" },
+    { label: "Total Revenue", value: `PKR ${stats.totalRevenue.toLocaleString()}`, icon: <TrendingUp size={20} />, color: "#8b5cf6", trend: "from verified ads" },
+    { label: "Registered Users", value: stats.totalUsers, icon: <Users size={20} />, color: "#06b6d4", trend: "clients" },
+    { label: "Awaiting Payment", value: stats.pendingPayment, icon: <CreditCard size={20} />, color: "#f97316", trend: "needs verification" },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <nav className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <span className="text-blue-400 font-bold text-lg">AdFlow Pro</span>
-        <div className="flex items-center gap-4">
-          <span className="text-gray-400 text-sm">{user?.name}</span>
-          <span className="bg-red-900/50 text-red-300 text-xs px-2 py-1 rounded-full border border-red-800">Admin</span>
-          <button onClick={logout} className="text-gray-500 hover:text-white text-sm transition">Logout</button>
-        </div>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold mb-2">Admin Dashboard</h1>
-        <p className="text-gray-400 mb-8">Verify payments and manage listings.</p>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          {[
-            { label: 'Pending Payments', value: payments.length, color: 'text-yellow-400' },
-            { label: 'Verified Today', value: '—', color: 'text-green-400' },
-            { label: 'Live Ads', value: '—', color: 'text-blue-400' },
-            { label: 'Total Revenue', value: '—', color: 'text-purple-400' },
-          ].map(stat => (
-            <div key={stat.label} className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <p className="text-gray-500 text-sm">{stat.label}</p>
-              <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+    <div className="flex min-h-screen" style={{ background: "#0a0d14" }}>
+      <DashboardSidebar role="admin" userName={user?.name} />
+      <main className="flex-1 overflow-auto">
+        {/* Header */}
+        <div className="px-8 py-6" style={{ borderBottom: "1px solid rgba(59,110,240,0.1)", background: "rgba(13,18,32,0.8)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Shield size={22} className="text-amber-400" /> Admin Dashboard
+              </h1>
+              <p className="text-slate-500 text-sm mt-0.5">Platform overview and management controls</p>
             </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3 mb-8">
-          {[
-            { label: 'Analytics', href: '/dashboard/admin/analytics' },
-            { label: 'Manage Users', href: '/dashboard/admin/users' },
-            { label: 'All Ads', href: '/dashboard/admin/ads' },
-            { label: 'Health Check', href: '/api/health/db' },
-          ].map(link => (
-            <a key={link.label} href={link.href}
-              className="border border-gray-700 hover:border-gray-500 px-4 py-2 rounded-lg text-sm text-gray-300 transition">
-              {link.label}
-            </a>
-          ))}
-        </div>
-
-        <h2 className="text-lg font-semibold mb-4">Payment Queue</h2>
-
-        {payments.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center">
-            <p className="text-4xl mb-4">✅</p>
-            <p className="text-gray-400">No pending payments.</p>
+            <button onClick={fetchData} disabled={refreshing} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm btn-outline">
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Refresh
+            </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {payments.map(payment => (
-              <div key={payment.id} className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-white">{payment.ads?.title}</h3>
-                    <p className="text-gray-500 text-sm mt-1">
-                      By {payment.users?.name} ({payment.users?.email})
-                    </p>
-                  </div>
-                  <span className="text-green-400 font-bold">PKR {Number(payment.amount).toLocaleString()}</span>
-                </div>
+        </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">Method</p>
-                    <p className="text-white mt-1">{payment.method}</p>
-                  </div>
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">Transaction Ref</p>
-                    <p className="text-white mt-1 font-mono text-xs">{payment.transaction_ref}</p>
-                  </div>
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">Sender</p>
-                    <p className="text-white mt-1">{payment.sender_name}</p>
-                  </div>
-                  <div className="bg-gray-800 rounded-lg p-3">
-                    <p className="text-gray-500 text-xs">Submitted</p>
-                    <p className="text-white mt-1">{new Date(payment.created_at).toLocaleDateString()}</p>
+        <div className="p-8 space-y-8">
+          {/* Stat grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {STAT_CARDS.map((s, i) => (
+              <div key={i} className="stat-card">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">{s.label}</span>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${s.color}18`, color: s.color }}>
+                    {s.icon}
                   </div>
                 </div>
-
-                {payment.screenshot_url && (
-                  <a href={payment.screenshot_url} target="_blank"
-                    className="text-blue-400 hover:underline text-sm mb-4 inline-block">
-                    View Screenshot →
-                  </a>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handlePayment(payment.id, 'verify')}
-                    disabled={actionLoading === payment.id + 'verify'}
-                    className="bg-green-700 hover:bg-green-600 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-medium transition"
-                  >
-                    {actionLoading === payment.id + 'verify' ? '...' : '✓ Verify & Publish'}
-                  </button>
-                  <button
-                    onClick={() => handlePayment(payment.id, 'reject')}
-                    disabled={actionLoading === payment.id + 'reject'}
-                    className="bg-red-800 hover:bg-red-700 disabled:opacity-50 px-5 py-2 rounded-lg text-sm font-medium transition"
-                  >
-                    {actionLoading === payment.id + 'reject' ? '...' : '✗ Reject'}
-                  </button>
-                </div>
+                <p className="text-3xl font-bold text-white mb-1">{loading ? "—" : s.value}</p>
+                <p className="text-xs text-slate-600">{s.trend}</p>
               </div>
             ))}
           </div>
-        )}
-      </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent Ads table */}
+            <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(59,110,240,0.15)", background: "rgba(13,18,32,0.8)" }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(59,110,240,0.1)" }}>
+                <h2 className="font-semibold text-white">Recent Submissions</h2>
+                <Link href="/dashboard/admin/ads" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">View all <ArrowRight size={12} /></Link>
+              </div>
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="p-6 space-y-4">{Array(5).fill(0).map((_, i) => <div key={i} className="shimmer h-10 rounded-xl" />)}</div>
+                ) : (
+                  <table className="w-full table-dark">
+                    <thead><tr><th className="text-left">Ad</th><th className="text-left">Category</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {recentAds.map(ad => {
+                        const sc = STATUS_CONFIG[ad.status] || STATUS_CONFIG.draft;
+                        return (
+                          <tr key={ad.id}>
+                            <td className="text-white text-xs font-medium max-w-xs">
+                              <span className="truncate block" style={{ maxWidth: "160px" }}>{ad.title}</span>
+                            </td>
+                            <td className="text-slate-500 text-xs">{ad.categories?.name || "—"}</td>
+                            <td className="text-center">
+                              <span className="px-2 py-1 rounded-lg text-xs font-medium" style={{ background: sc.bg, color: sc.color }}>{sc.label}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Payment queue */}
+            <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(59,110,240,0.15)", background: "rgba(13,18,32,0.8)" }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(59,110,240,0.1)" }}>
+                <h2 className="font-semibold text-white flex items-center gap-2"><CreditCard size={16} className="text-amber-400" /> Payment Verification</h2>
+                <Link href="/dashboard/admin/payments" className="text-xs text-blue-400 flex items-center gap-1">View all <ArrowRight size={12} /></Link>
+              </div>
+              {recentPayments.length === 0 ? (
+                <div className="p-10 text-center">
+                  <CheckCircle size={32} className="text-emerald-600 mx-auto mb-2" />
+                  <p className="text-slate-500 text-sm">No pending payments</p>
+                </div>
+              ) : (
+                <div className="divide-y" style={{ borderColor: "rgba(59,110,240,0.08)" }}>
+                  {recentPayments.map(p => (
+                    <div key={p.id} className="px-5 py-4 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-medium truncate">{p.ads?.title}</p>
+                        <p className="text-slate-500 text-xs">PKR {p.amount?.toLocaleString()} · {p.method}</p>
+                        <p className="text-slate-600 text-xs mt-0.5">Ref: {p.transaction_ref}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {p.status === "pending" ? (
+                          <button onClick={() => verifyPayment(p.id, p.ad_id)} className="px-3 py-1.5 rounded-lg text-xs font-medium btn-primary">
+                            Verify
+                          </button>
+                        ) : (
+                          <span className="px-2 py-1 rounded-lg text-xs" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}>Verified</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { href: "/dashboard/moderator/review", icon: <Eye size={18} />, title: "Review Queue", desc: `${stats.pendingReview} pending`, color: "#3b6ef0" },
+              { href: "/dashboard/admin/payments", icon: <CreditCard size={18} />, title: "Payments", desc: `${stats.pendingPayment} to verify`, color: "#f59e0b" },
+              { href: "/dashboard/admin/analytics", icon: <BarChart3 size={18} />, title: "Analytics", desc: "View metrics", color: "#8b5cf6" },
+              { href: "/dashboard/admin/system", icon: <Activity size={18} />, title: "System Health", desc: "Check status", color: "#10b981" },
+            ].map((a, i) => (
+              <Link key={i} href={a.href} className="flex items-center gap-3 p-5 rounded-2xl transition-all hover:-translate-y-1 group" style={{ background: "rgba(20,27,45,0.8)", border: "1px solid rgba(59,110,240,0.12)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${a.color}18`, color: a.color }}>
+                  {a.icon}
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">{a.title}</p>
+                  <p className="text-slate-500 text-xs">{a.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </main>
     </div>
-  )
+  );
 }
