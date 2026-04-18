@@ -2,8 +2,9 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next",
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key"
-  }
+  "crons": [
+    { "path": "/api/cron/publish-scheduled", "schedule": "0 * * * *" },
+    { "path": "/api/cron/expire-ads", "schedule": "0 0 * * *" },
+    { "path": "/api/health/db", "schedule": "*/30 * * * *" }
+  ]
 }
