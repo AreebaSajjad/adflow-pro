@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
-export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+
   const { data: ad, error } = await supabaseAdmin
     .from("ads")
     .select("*, packages(*), categories(*), cities(*), ad_media(*)")
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .eq("status", "published")
     .single();
 

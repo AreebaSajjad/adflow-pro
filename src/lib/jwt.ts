@@ -1,21 +1,14 @@
-import { SignJWT, jwtVerify } from "jose";
+import jwt from "jsonwebtoken";
 
-const SECRET = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET || "adflow2024secretkeydontsharethis"
-);
+const SECRET = process.env.NEXTAUTH_SECRET || "adflow2024secret";
 
-export async function signToken(payload: Record<string, any>) {
-  return await new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(SECRET);
+export function signToken(payload: Record<string, any>): string {
+  return jwt.sign(payload, SECRET, { expiresIn: "7d" });
 }
 
-export async function verifyToken(token: string) {
+export function verifyToken(token: string): any {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return payload;
+    return jwt.verify(token, SECRET);
   } catch {
     return null;
   }

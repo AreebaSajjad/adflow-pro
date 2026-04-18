@@ -3,7 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// Public client (browser safe)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Admin client (server only — never expose to browser)
+export const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Types based on your schema
 export type UserRole = 'client' | 'moderator' | 'admin' | 'super_admin';

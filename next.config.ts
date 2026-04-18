@@ -7,7 +7,12 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    domains: ['img.youtube.com', 'res.cloudinary.com', 'raw.githubusercontent.com'],
+    domains: [
+      'img.youtube.com',
+      'res.cloudinary.com', 
+      'raw.githubusercontent.com',
+      'images.unsplash.com',
+    ],
   },
 }
 
