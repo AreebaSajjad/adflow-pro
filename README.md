@@ -14,7 +14,7 @@
 
 ## 🔗 Live Demo
 
-**[https://areeba-sajjad.vercel.app/](https://areeba-sajjad.vercel.app/)**
+**[https://adflow-beige-six.vercel.app](https://adflow-beige-six.vercel.app)**
  
  Admin | admin@adflow.com | admin123 |
  Moderator | mod@adflow.com | admin123 |
