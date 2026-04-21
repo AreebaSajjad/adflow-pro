@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { signToken } from "@/lib/jwt";
+const supabaseAdmin = getSupabaseAdmin();
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyToken } from "@/lib/jwt";
-
+const supabaseAdmin = getSupabaseAdmin();
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const token = req.cookies.get("adflow_token")?.value;
   const payload = token ? await verifyToken(token) : null;

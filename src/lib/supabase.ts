@@ -3,20 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Public client (browser safe)
+// Public client (browser + server safe)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Admin client (server only — service role bypasses RLS)
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
+// Admin client — only call this in API routes (server-side only)
+export function getSupabaseAdmin() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY missing — only use getSupabaseAdmin() in API routes");
+  return createClient(supabaseUrl, serviceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     }
-  }
-);
+  });
+}
 
 // Types
 export type UserRole = 'client' | 'moderator' | 'admin' | 'super_admin';

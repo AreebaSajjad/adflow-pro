@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
-
+import { getSupabaseAdmin } from "@/lib/supabase";
+const supabaseAdmin = getSupabaseAdmin();
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("learning_questions").select("*").eq("is_active", true);

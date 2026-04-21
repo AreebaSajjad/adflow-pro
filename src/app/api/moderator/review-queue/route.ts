@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { verifyToken } from "@/lib/jwt";
-
+const supabaseAdmin = getSupabaseAdmin();
 async function requireModerator(req: NextRequest) {
   const token = req.cookies.get("adflow_token")?.value;
   const payload = token ? await verifyToken(token) : null;

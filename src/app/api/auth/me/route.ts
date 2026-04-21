@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/jwt";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
+const supabaseAdmin = getSupabaseAdmin();
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("adflow_token")?.value;
