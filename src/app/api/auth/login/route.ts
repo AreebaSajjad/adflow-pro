@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { signToken } from "@/lib/jwt";
+import bcrypt from "bcryptjs";
 const supabaseAdmin = getSupabaseAdmin();
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,8 @@ export async function POST(req: NextRequest) {
 
     if (error || !user)
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
-    if (user.password_hash !== password)
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid)
       return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
     if (user.status === "suspended" || user.status === "banned")
       return NextResponse.json({ error: "Your account has been suspended." }, { status: 403 });
@@ -30,7 +32,15 @@ export async function POST(req: NextRequest) {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
       token,
     });
-    res.cookies.set("adflow_token", token, { httpOnly: true, secure: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 7 });
+    res.cookies.set({
+  name: "adflow_token",
+  value: token,
+  httpOnly: true,
+  secure: false,
+  sameSite: "lax",
+  maxAge: 60 * 60 * 24 * 7,
+  path: "/",
+});
     return res;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Login failed." }, { status: 500 });

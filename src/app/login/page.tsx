@@ -11,37 +11,33 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      // Try to find user in your custom users table
-      const { data: users, error: fetchErr } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
+ async function handleLogin(e: React.FormEvent) {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || "Login failed."); return; }
 
-      if (fetchErr || !users) {
-        setError("Invalid email or password.");
-        return;
-      }
+    // ✅ token bhi save karo
+    localStorage.setItem("adflow_user", JSON.stringify({ ...data.user, token: data.token }));
 
-      // Store user session in localStorage
-      localStorage.setItem("adflow_user", JSON.stringify(users));
-
-      // Redirect based on role
-      const role = users.role;
-      if (role === "admin" || role === "super_admin") window.location.href = "/dashboard/admin";
-      else if (role === "moderator") window.location.href = "/dashboard/moderator";
-      else window.location.href = "/dashboard/client";
-    } catch (err) {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    const role = data.user.role;
+    if (role === "admin" || role === "super_admin") window.location.href = "/dashboard/admin";
+    else if (role === "moderator") window.location.href = "/dashboard/moderator";
+    else window.location.href = "/dashboard/client";
+  } catch (err) {
+    setError("Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 hero-gradient grid-pattern">

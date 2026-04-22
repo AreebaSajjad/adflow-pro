@@ -14,23 +14,33 @@ function getYoutubeThumbnail(url: string) {
 
 // GET /api/client/ads — list own ads
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("adflow_token")?.value;
+  // ✅ Cookie aur Authorization header dono check karo
+  const token = req.cookies.get("adflow_token")?.value
+    || req.headers.get("authorization")?.replace("Bearer ", "");
   const payload = token ? await verifyToken(token) : null;
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabaseAdmin
+  const { searchParams } = new URL(req.url);
+  const status = searchParams.get("status");
+
+  let query = supabaseAdmin
     .from("ads")
     .select("*, packages(*), categories(*), cities(*), ad_media(*)")
     .eq("user_id", payload.id as string)
     .order("created_at", { ascending: false });
 
+  if (status) query = query.eq("status", status);
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ads: data });
 }
 
 // POST /api/client/ads — create new ad
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get("adflow_token")?.value;
+  // ✅ Cookie aur Authorization header dono check karo
+  const token = req.cookies.get("adflow_token")?.value
+    || req.headers.get("authorization")?.replace("Bearer ", "");
   const payload = token ? await verifyToken(token) : null;
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -40,7 +50,6 @@ export async function POST(req: NextRequest) {
   if (!title || !description || !category_id || !city_id || !package_id)
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
 
-  // Get package for duration
   const { data: pkg } = await supabaseAdmin.from("packages").select("*").eq("id", package_id).single();
   const expireAt = pkg ? new Date(Date.now() + pkg.duration_days * 86400000).toISOString() : null;
   const rankScore = (pkg?.weight || 1) * 10;
@@ -55,7 +64,6 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Add media
   if (mediaUrl && ad) {
     const thumbnail = mediaType === "youtube" ? getYoutubeThumbnail(mediaUrl) : mediaUrl;
     await supabaseAdmin.from("ad_media").insert({
@@ -65,7 +73,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Log status history
   await supabaseAdmin.from("ad_status_history").insert({
     ad_id: ad.id, previous_status: "draft",
     new_status: "submitted", changed_by: payload.id as string,
@@ -78,7 +85,6 @@ export async function POST(req: NextRequest) {
     new_value: { title, status: "submitted" },
   });
 
-  // Notify user
   await supabaseAdmin.from("notifications").insert({
     user_id: payload.id, title: "Ad Submitted!",
     message: `Your ad "${title}" is under review. We'll notify you once approved.`,
