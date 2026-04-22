@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin, AlertCircle, CheckCircle, ArrowRight } from "lucide-react";
 
 export default function RegisterPage() {
@@ -21,28 +20,21 @@ export default function RegisterPage() {
     if (form.password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
     try {
-      // Check if email already exists
-      const { data: existing } = await supabase.from("users").select("id").eq("email", form.email).single();
-      if (existing) { setError("An account with this email already exists."); return; }
+      // ✅ API route use karo — bcrypt hash hoga automatically
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Registration failed."); return; }
 
-      // Create user (in production, password should be hashed server-side)
-      const { data: newUser, error: insertErr } = await supabase.from("users").insert({
-        name: form.name, email: form.email,
-        password_hash: form.password, // In production: bcrypt hash via API route
-        role: "client", status: "active",
-      }).select().single();
-
-      if (insertErr) throw insertErr;
-
-      // Create seller profile
-      if (newUser) {
-        await supabase.from("seller_profiles").insert({
-          user_id: newUser.id, display_name: form.displayName || form.name,
-          phone: form.phone, city: form.city,
-        });
-      }
+      // ✅ token localStorage mein save karo
+      localStorage.setItem("adflow_user", JSON.stringify({ ...data.user, token: data.token }));
 
       setSuccess(true);
+      setTimeout(() => { window.location.href = "/dashboard/client"; }, 1500);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {
@@ -57,8 +49,7 @@ export default function RegisterPage() {
           <CheckCircle size={40} className="text-emerald-400" />
         </div>
         <h2 className="text-3xl font-bold text-white mb-3">Account Created!</h2>
-        <p className="text-slate-400 mb-8">Welcome to AdFlow Pro. You can now login and start posting ads.</p>
-        <Link href="/login" className="inline-block px-8 py-4 rounded-2xl font-bold btn-primary">Go to Login <ArrowRight size={16} className="inline ml-1" /></Link>
+        <p className="text-slate-400 mb-8">Welcome to AdFlow Pro. Redirecting to dashboard...</p>
       </div>
     </div>
   );

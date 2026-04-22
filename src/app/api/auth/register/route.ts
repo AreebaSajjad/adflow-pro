@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { signToken } from "@/lib/jwt";
+import bcrypt from "bcryptjs";
 const supabaseAdmin = getSupabaseAdmin();
 
 export async function POST(req: NextRequest) {
@@ -15,8 +16,11 @@ export async function POST(req: NextRequest) {
     const { data: existing } = await supabaseAdmin.from("users").select("id").eq("email", email).single();
     if (existing) return NextResponse.json({ error: "Email already registered." }, { status: 409 });
 
+    // ✅ Password bcrypt hash karo
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     const { data: user, error } = await supabaseAdmin.from("users").insert({
-      name, email, password_hash: password, role: "client", status: "active",
+      name, email, password_hash: hashedPassword, role: "client", status: "active",
     }).select().single();
 
     if (error) throw error;
@@ -31,9 +35,21 @@ export async function POST(req: NextRequest) {
       new_value: { email, role: "client" },
     });
 
-    const token = await signToken({ id: user.id, email: user.email, role: user.role, name: user.name });
-    const res = NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-    res.cookies.set("adflow_token", token, { httpOnly: true, secure: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 7 });
+    const token = signToken({ id: user.id, email: user.email, role: user.role, name: user.name });
+    const res = NextResponse.json({
+      success: true,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      token,
+    });
+    res.cookies.set({
+      name: "adflow_token",
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
     return res;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Registration failed." }, { status: 500 });
