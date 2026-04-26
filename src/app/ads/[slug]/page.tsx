@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import {
   MapPin, Tag, Clock, Star, Zap, Shield, ChevronRight,
   Phone, Mail, ArrowLeft, Share2, Flag, CheckCircle,
-  Calendar, Package, Eye, ExternalLink, Play
+  Calendar, Package, Eye, ExternalLink, Play, MessageCircle, Lock
 } from "lucide-react";
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -41,7 +41,6 @@ function MediaPreview({ media }: { media: any[] }) {
 
   return (
     <div className="space-y-3">
-      {/* Main media */}
       <div className="relative w-full rounded-2xl overflow-hidden" style={{ height: "340px", background: "rgba(10,13,20,0.9)" }}>
         <img
           src={displaySrc}
@@ -57,13 +56,10 @@ function MediaPreview({ media }: { media: any[] }) {
             </div>
           </a>
         )}
-        {/* Source badge */}
         <div className="absolute top-3 right-3 px-2 py-1 rounded-lg text-xs font-medium capitalize" style={{ background: "rgba(10,13,20,0.8)", color: "#5f8ef5", border: "1px solid rgba(59,110,240,0.3)" }}>
           {current.source_type}
         </div>
       </div>
-
-      {/* Thumbnails row if multiple */}
       {media.length > 1 && (
         <div className="flex gap-2">
           {media.map((m, i) => (
@@ -88,6 +84,17 @@ export default function AdDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [messagingLoading, setMessagingLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => { if (d.user) setCurrentUser(d.user); })
+      .catch(() => {})
+      .finally(() => setAuthLoading(false));
+  }, []);
 
   useEffect(() => {
     if (slug) fetchAd();
@@ -104,7 +111,6 @@ export default function AdDetailPage() {
     if (error || !data) { setNotFound(true); setLoading(false); return; }
     setAd(data);
 
-    // Fetch seller profile
     const { data: profile } = await supabase
       .from("seller_profiles")
       .select("*, users(name, email, created_at)")
@@ -125,7 +131,29 @@ export default function AdDetailPage() {
     return Math.max(0, Math.ceil((new Date(ad.expire_at).getTime() - Date.now()) / 86400000));
   }
 
-  // Loading skeleton
+  async function handleMessageSeller() {
+    if (!ad || messagingLoading) return;
+    setMessagingLoading(true);
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ad_id: ad.id, seller_id: ad.user_id }),
+      });
+      const data = await res.json();
+      if (data.conversation?.id) {
+        window.location.href = `/dashboard/client/messages/${data.conversation.id}`;
+      } else {
+        console.error("Conversation error:", data.error);
+        alert("Could not start conversation. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error starting conversation:", err);
+      alert("Network error. Please try again.");
+    }
+    setMessagingLoading(false);
+  }
+
   if (loading) return (
     <div className="min-h-screen" style={{ background: "#0a0d14" }}>
       <Navbar />
@@ -147,7 +175,6 @@ export default function AdDetailPage() {
     </div>
   );
 
-  // Not found
   if (notFound) return (
     <div className="min-h-screen" style={{ background: "#0a0d14" }}>
       <Navbar />
@@ -166,6 +193,9 @@ export default function AdDetailPage() {
   const days = daysLeft();
   const isPremium = ad.packages?.name === "Premium";
   const isStandard = ad.packages?.name === "Standard";
+  // IMPORTANT: isLoggedIn only true AFTER auth check is done
+  const isLoggedIn = !authLoading && !!currentUser;
+  const isSeller = !authLoading && currentUser?.id === ad.user_id;
 
   return (
     <div className="min-h-screen" style={{ background: "#0a0d14" }}>
@@ -191,12 +221,10 @@ export default function AdDetailPage() {
             {/* LEFT — Media + Details */}
             <div className="lg:col-span-2 space-y-6">
 
-              {/* Media */}
               <MediaPreview media={ad.ad_media || []} />
 
               {/* Title + price */}
               <div className="rounded-2xl p-6" style={{ background: "rgba(13,18,32,0.8)", border: "1px solid rgba(59,110,240,0.12)" }}>
-                {/* Badges row */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   {ad.packages && (
                     <span className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1"
@@ -227,7 +255,6 @@ export default function AdDetailPage() {
                   </p>
                 )}
 
-                {/* Meta pills */}
                 <div className="flex flex-wrap gap-3">
                   {ad.categories && (
                     <Link href={`/explore?category=${ad.categories.slug}`}
@@ -290,10 +317,9 @@ export default function AdDetailPage() {
               </div>
             </div>
 
-            {/* RIGHT — Seller card + safety */}
+            {/* RIGHT — Seller card */}
             <div className="space-y-5">
 
-              {/* Contact / Seller card */}
               <div className="rounded-2xl p-6" style={{ background: "rgba(13,18,32,0.8)", border: "1px solid rgba(59,110,240,0.2)" }}>
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0"
@@ -311,24 +337,94 @@ export default function AdDetailPage() {
                   </div>
                 </div>
 
-                {/* Contact info */}
+                {/* Contact buttons */}
                 <div className="space-y-3 mb-5">
-                  {seller?.phone && (
-                    <a href={`tel:${seller.phone}`}
-                      className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all btn-primary font-medium text-sm">
-                      <Phone size={16} /> {seller.phone}
-                    </a>
+
+                  {/* Auth still loading — shimmer placeholder, nothing leaks */}
+                  {authLoading && (
+                    <>
+                      <div className="shimmer h-11 rounded-xl w-full" />
+                      <div className="shimmer h-11 rounded-xl w-full" />
+                      <div className="shimmer h-11 rounded-xl w-full" />
+                    </>
                   )}
-                  {seller?.users?.email && (
-                    <a href={`mailto:${seller.users.email}`}
-                      className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all btn-outline text-sm font-medium">
-                      <Mail size={16} /> Send Email
-                    </a>
-                  )}
-                  {!seller?.phone && !seller?.users?.email && (
-                    <div className="px-4 py-3 rounded-xl text-sm text-center text-slate-500" style={{ background: "rgba(59,110,240,0.06)" }}>
-                      Contact info not available
-                    </div>
+
+                  {!authLoading && (
+                    <>
+                      {/* Own listing */}
+                      {isSeller ? (
+                        <div className="px-4 py-3 rounded-xl text-sm text-center text-slate-500"
+                          style={{ background: "rgba(59,110,240,0.06)", border: "1px solid rgba(59,110,240,0.1)" }}>
+                          This is your listing
+                        </div>
+                      ) : (
+                        <>
+                          {/* ── PHONE ── */}
+                          {seller?.phone && (
+                            isLoggedIn ? (
+                              <a href={`tel:${seller.phone}`}
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all btn-primary font-medium text-sm">
+                                <Phone size={16} /> {seller.phone}
+                              </a>
+                            ) : (
+                              /* Guest: masked number + login prompt */
+                              <a href={`/login?redirect=/ads/${ad.slug}`}
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all font-medium text-sm justify-between"
+                                style={{ background: "rgba(59,110,240,0.08)", border: "1px solid rgba(59,110,240,0.25)", color: "#94a3b8" }}>
+                                <span className="flex items-center gap-2">
+                                  <Phone size={16} />
+                                  <span className="tracking-widest text-slate-600 select-none">••••••••••</span>
+                                </span>
+                                <span className="flex items-center gap-1 text-xs text-blue-400">
+                                  <Lock size={11} /> Login to view
+                                </span>
+                              </a>
+                            )
+                          )}
+
+                          {/* ── EMAIL ── */}
+                          {seller?.users?.email && (
+                            isLoggedIn ? (
+                              <a href={`mailto:${seller.users.email}`}
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all btn-outline text-sm font-medium">
+                                <Mail size={16} /> Send Email
+                              </a>
+                            ) : (
+                              <a href={`/login?redirect=/ads/${ad.slug}`}
+                                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all text-sm font-medium justify-center"
+                                style={{ background: "rgba(59,110,240,0.06)", border: "1px solid rgba(59,110,240,0.15)", color: "#475569" }}>
+                                <Mail size={16} /> Login to Send Email
+                              </a>
+                            )
+                          )}
+
+                          {/* No contact info fallback */}
+                          {!seller?.phone && !seller?.users?.email && (
+                            <div className="px-4 py-3 rounded-xl text-sm text-center text-slate-500" style={{ background: "rgba(59,110,240,0.06)" }}>
+                              Contact info not available
+                            </div>
+                          )}
+
+                          {/* ── MESSAGE SELLER ── */}
+                          {isLoggedIn ? (
+                            <button
+                              onClick={handleMessageSeller}
+                              disabled={messagingLoading}
+                              className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-medium text-sm transition-all justify-center disabled:opacity-60 cursor-pointer"
+                              style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981" }}>
+                              <MessageCircle size={16} />
+                              {messagingLoading ? "Opening chat..." : "Message Seller"}
+                            </button>
+                          ) : (
+                            <a href={`/login?redirect=/ads/${ad.slug}`}
+                              className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-medium text-sm transition-all justify-center"
+                              style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", color: "#475569" }}>
+                              <MessageCircle size={16} /> Login to Message Seller
+                            </a>
+                          )}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
 

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +15,7 @@ const CLIENT_NAV = [
   { href: "/dashboard/client/create-ad", icon: <Plus size={18} />, label: "Post New Ad" },
   { href: "/dashboard/client/payments", icon: <CreditCard size={18} />, label: "Payments" },
   { href: "/dashboard/client/notifications", icon: <Bell size={18} />, label: "Notifications" },
+  { href: "/dashboard/client/messages", icon: <MessageCircle size={18} />, label: "Messages" }, 
 ];
 
 const MOD_NAV = [
